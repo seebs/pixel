@@ -291,7 +291,7 @@ func (imd *IMDraw) fillRectangle() {
 	}
 
 	off := imd.tri.Len()
-	imd.tri.SetLen(imd.tri.Len() + 6*(len(points)-1))
+	imd.tri.SetLen(off + 6*(len(points)-1))
 
 	for i, j := 0, off; i+1 < len(points); i, j = i+1, j+6 {
 		a, b := points[i], points[i+1]
@@ -355,7 +355,7 @@ func (imd *IMDraw) fillPolygon() {
 	}
 
 	off := imd.tri.Len()
-	imd.tri.SetLen(imd.tri.Len() + 3*(len(points)-2))
+	imd.tri.SetLen(off + 3*(len(points)-2))
 
 	for i, j := 1, off; i+1 < len(points); i, j = i+1, j+3 {
 		for k, p := range [...]int{0, i, i + 1} {
@@ -381,7 +381,7 @@ func (imd *IMDraw) fillEllipseArc(radius pixel.Vec, low, high float64) {
 		delta := (high - low) / num
 
 		off := imd.tri.Len()
-		imd.tri.SetLen(imd.tri.Len() + 3*int(num))
+		imd.tri.SetLen(off + 3*int(num))
 
 		for i := range (*imd.tri)[off:] {
 			(*imd.tri)[off+i].Color = pt.col
@@ -389,9 +389,9 @@ func (imd *IMDraw) fillEllipseArc(radius pixel.Vec, low, high float64) {
 			(*imd.tri)[off+i].Intensity = 0
 		}
 
+		angle := low
+		sin, cos := math.Sincos(angle)
 		for i, j := 0.0, off; i < num; i, j = i+1, j+3 {
-			angle := low + i*delta
-			sin, cos := math.Sincos(angle)
 			a := pt.pos.Add(pixel.V(
 				radius.X*cos,
 				radius.Y*sin,
@@ -424,7 +424,7 @@ func (imd *IMDraw) outlineEllipseArc(radius pixel.Vec, low, high, thickness floa
 		delta := (high - low) / num
 
 		off := imd.tri.Len()
-		imd.tri.SetLen(imd.tri.Len() + 6*int(num))
+		imd.tri.SetLen(off + 6*int(num))
 
 		for i := range (*imd.tri)[off:] {
 			(*imd.tri)[off+i].Color = pt.col
@@ -432,9 +432,9 @@ func (imd *IMDraw) outlineEllipseArc(radius pixel.Vec, low, high, thickness floa
 			(*imd.tri)[off+i].Intensity = 0
 		}
 
+		angle := low
+		sin, cos := math.Sincos(angle)
 		for i, j := 0.0, off; i < num; i, j = i+1, j+6 {
-			angle := low + i*delta
-			sin, cos := math.Sincos(angle)
 			normalSin, normalCos := pixel.V(sin, cos).ScaledXY(radius).Unit().XY()
 			a := pt.pos.Add(pixel.V(
 				radius.X*cos-thickness/2*normalCos,
