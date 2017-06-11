@@ -72,6 +72,9 @@ func (c *Canvas) MakeTriangles(t pixel.Triangles) pixel.TargetTriangles {
 // PictureColor is supported.
 func (c *Canvas) MakePicture(p pixel.Picture) pixel.TargetPicture {
 	if cp, ok := p.(*canvasPicture); ok {
+		if cp.dst == c {
+			return cp
+		}
 		return &canvasPicture{
 			GLPicture: cp.GLPicture,
 			dst:       c,
