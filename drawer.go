@@ -24,23 +24,22 @@ type Drawer struct {
 	Triangles Triangles
 	Picture   Picture
 
-	tris   map[Target]TargetTriangles
-	clean  map[Target]bool
-	pics   map[targetPicturePair]TargetPicture
-	dirty  bool
-	inited bool
+	targets map[Target]*drawerTarget
+	dirty   bool
+	inited  bool
 }
 
-type targetPicturePair struct {
-	Target  Target
-	Picture Picture
+type drawerTarget struct {
+	tris          TargetTriangles
+	clean         bool
+	pics          map[Picture]TargetPicture
+	lastPic       Picture
+	lastTargetPic TargetPicture
 }
 
 func (d *Drawer) lazyInit() {
 	if !d.inited {
-		d.tris = make(map[Target]TargetTriangles)
-		d.clean = make(map[Target]bool)
-		d.pics = make(map[targetPicturePair]TargetPicture)
+		d.targets = make(map[Target]*drawerTarget)
 		d.inited = true
 	}
 }
@@ -61,8 +60,8 @@ func (d *Drawer) Draw(t Target) {
 	d.lazyInit()
 
 	if d.dirty {
-		for t := range d.clean {
-			d.clean[t] = false
+		for _, target := range d.targets {
+			target.clean = false
 		}
 		d.dirty = false
 	}
@@ -71,29 +70,49 @@ func (d *Drawer) Draw(t Target) {
 		return
 	}
 
-	tri := d.tris[t]
-	if tri == nil {
-		tri = t.MakeTriangles(d.Triangles)
-		d.tris[t] = tri
-		d.clean[t] = true
+	target := d.targets[t]
+	if target == nil {
+		picMap := make(map[Picture]TargetPicture)
+		targetPic := TargetPicture(nil)
+		if d.Picture != nil {
+			targetPic = t.MakePicture(d.Picture)
+			picMap[d.Picture] = targetPic
+		}
+
+		newTarget := &drawerTarget{
+			tris:          t.MakeTriangles(d.Triangles),
+			clean:         true,
+			pics:          picMap,
+			lastPic:       d.Picture,
+			lastTargetPic: targetPic,
+		}
+		d.targets[t] = newTarget
+		target = newTarget
 	}
 
-	if !d.clean[t] {
-		tri.SetLen(d.Triangles.Len())
-		tri.Update(d.Triangles)
-		d.clean[t] = true
+	if !target.clean {
+		target.tris.SetLen(d.Triangles.Len())
+		target.tris.Update(d.Triangles)
+		target.clean = true
 	}
 
 	if d.Picture == nil {
-		tri.Draw()
+		target.tris.Draw()
 		return
 	}
 
-	pic := d.pics[targetPicturePair{t, d.Picture}]
-	if pic == nil {
-		pic = t.MakePicture(d.Picture)
-		d.pics[targetPicturePair{t, d.Picture}] = pic
+	if d.Picture == target.lastPic {
+		target.lastTargetPic.Draw(target.tris)
+		return
 	}
 
-	pic.Draw(tri)
+	pic := target.pics[d.Picture]
+	if pic == nil {
+		pic = t.MakePicture(d.Picture)
+		target.pics[d.Picture] = pic
+	}
+	target.lastPic = d.Picture
+	target.lastTargetPic = pic
+
+	pic.Draw(target.tris)
 }
