@@ -172,6 +172,7 @@ func (imd *IMDraw) MakePicture(p pixel.Picture) pixel.TargetPicture {
 
 // Line draws a polyline of the specified thickness between the Pushed points.
 func (imd *IMDraw) Line(thickness float64) {
+	imd.applyMask(imd.points)
 	imd.polyline(thickness, false)
 }
 
@@ -182,6 +183,7 @@ func (imd *IMDraw) Line(thickness float64) {
 // If the thickness is 0, rectangles will be filled, otherwise will be outlined with the given
 // thickness.
 func (imd *IMDraw) Rectangle(thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillRectangle()
 	} else {
@@ -197,6 +199,7 @@ func (imd *IMDraw) Rectangle(thickness float64) {
 // triangle is drawn between each two adjacent points and the first Pushed point. You can use this
 // property to draw certain kinds of concave polygons.
 func (imd *IMDraw) Polygon(thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillPolygon()
 	} else {
@@ -207,6 +210,7 @@ func (imd *IMDraw) Polygon(thickness float64) {
 // Circle draws a circle of the specified radius around each Pushed point. If the thickness is 0,
 // the circle will be filled, otherwise a circle outline of the specified thickness will be drawn.
 func (imd *IMDraw) Circle(radius, thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillEllipseArc(pixel.V(radius, radius), 0, 2*math.Pi)
 	} else {
@@ -223,6 +227,7 @@ func (imd *IMDraw) Circle(radius, thickness float64) {
 //
 // This line will fill the whole circle 4 times.
 func (imd *IMDraw) CircleArc(radius, low, high, thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillEllipseArc(pixel.V(radius, radius), low, high)
 	} else {
@@ -234,6 +239,7 @@ func (imd *IMDraw) CircleArc(radius, low, high, thickness float64) {
 // thickness is 0, the ellipse will be filled, otherwise an ellipse outline of the specified
 // thickness will be drawn.
 func (imd *IMDraw) Ellipse(radius pixel.Vec, thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillEllipseArc(radius, 0, 2*math.Pi)
 	} else {
@@ -250,6 +256,7 @@ func (imd *IMDraw) Ellipse(radius pixel.Vec, thickness float64) {
 //
 // This line will fill the whole ellipse 4 times.
 func (imd *IMDraw) EllipseArc(radius pixel.Vec, low, high, thickness float64) {
+	imd.applyMask(imd.points)
 	if thickness == 0 {
 		imd.fillEllipseArc(radius, low, high)
 	} else {
@@ -275,10 +282,21 @@ func (imd *IMDraw) restorePoints(points []point) {
 	imd.points = points[:0]
 }
 
-func (imd *IMDraw) applyMatrixAndMask(off int) {
+func (imd *IMDraw) applyMask(points []point) {
+	for i := range points {
+		points[i].col = imd.mask.Mul(points[i].col)
+	}
+}
+
+func (imd *IMDraw) applyMatrixToPoints(points []point) {
+	for i := range points {
+		points[i].pos = imd.matrix.Project(points[i].pos)
+	}
+}
+
+func (imd *IMDraw) applyMatrix(off int) {
 	for i := range (*imd.tri)[off:] {
 		(*imd.tri)[off+i].Position = imd.matrix.Project((*imd.tri)[off+i].Position)
-		(*imd.tri)[off+i].Color = imd.mask.Mul((*imd.tri)[off+i].Color)
 	}
 }
 
@@ -316,7 +334,7 @@ func (imd *IMDraw) fillRectangle() {
 		}
 	}
 
-	imd.applyMatrixAndMask(off)
+	imd.applyMatrix(off)
 	imd.batch.Dirty()
 
 	imd.restorePoints(points)
@@ -356,6 +374,7 @@ func (imd *IMDraw) fillPolygon() {
 
 	off := imd.tri.Len()
 	imd.tri.SetLen(off + 3*(len(points)-2))
+	imd.applyMatrixToPoints(points)
 
 	for i, j := 1, off; i+1 < len(points); i, j = i+1, j+3 {
 		for k, p := range [...]int{0, i, i + 1} {
@@ -367,7 +386,6 @@ func (imd *IMDraw) fillPolygon() {
 		}
 	}
 
-	imd.applyMatrixAndMask(off)
 	imd.batch.Dirty()
 
 	imd.restorePoints(points)
@@ -409,7 +427,7 @@ func (imd *IMDraw) fillEllipseArc(radius pixel.Vec, low, high float64) {
 			(*imd.tri)[j+2].Position = b
 		}
 
-		imd.applyMatrixAndMask(off)
+		imd.applyMatrix(off)
 		imd.batch.Dirty()
 	}
 
@@ -465,7 +483,7 @@ func (imd *IMDraw) outlineEllipseArc(radius pixel.Vec, low, high, thickness floa
 			(*imd.tri)[j+5].Position = d
 		}
 
-		imd.applyMatrixAndMask(off)
+		imd.applyMatrix(off)
 		imd.batch.Dirty()
 
 		if doEndShape {
